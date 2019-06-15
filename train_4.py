@@ -31,7 +31,7 @@ class World4(object):
     def __init__(self, size=(4, 4)):
         super(World4, self).__init__()
         self.size = size
-        self.world = torch.FloatTensor(np.zeros((2, self.size**2)))
+        self.world = torch.FloatTensor(np.zeros((2, self.size**2))).cuda()
         self.states = []
         self.last_idx0 = -1
         self.last_idx1 = -1
@@ -47,7 +47,7 @@ class World4(object):
         if player == 1:
             self.last_idx1 = torch.argmax(choice)
 
-        assert not np.any(self.world > 1)
+        #assert not np.any(self.world > 1)
 
     def save_state(self, pred):
         # pred = prediction which lead to this state
@@ -76,7 +76,7 @@ class World4(object):
     def game_over(self):
         if False: #len(self.states) > 1:
             return (False, True)
-        world = self.world.clone().detach()
+        world = self.world.clone().detach().cpu()
         horizx = np.any(
             world[0].view([self.size]*2).sum(0).data == self.size)
         horizy = np.any(
@@ -141,10 +141,11 @@ def run(world, model, optimizer, batch_size=100):
                            verbose=False)
 
         if np.any(result):
-            #idx0 = world.world[0] > 0
-            #idx1 = world.world[1] > 0
-            loss0 = world.world[0][world.last_idx0] * ((2 * (result[1])) - 1)
-            loss1 = world.world[1][world.last_idx1] * ((2 * (result[0])) - 1)
+            idx0 = world.world[0] > 0
+            idx1 = world.world[1] > 0
+            #world.last_idx0
+            loss0 = world.world[0][idx0].mean() * ((2 * (result[1])) - 1)
+            loss1 = world.world[1][idx1].mean() * ((2 * (result[0])) - 1)
             loss = loss0 + loss1
             loss.backward()
             #world.plot_grads()
@@ -152,9 +153,9 @@ def run(world, model, optimizer, batch_size=100):
 
             if i % batch_size == 0:
                 print(f"\n--------------{i}--------------")
-                world.print()
+                #world.print()
                 print(result)
-                compare_states()
+                #compare_states()
 
 
             i = i + 1
@@ -223,5 +224,6 @@ if __name__ == '__main__':
     world = World4(4)
     n_out = world.size**2
     model = FFNN(n_out * 2, n_out, n_mid=128)
+    model.cuda()
     optimizer = Adam(model.parameters(), lr=0.001)
     run(world, model, optimizer)
