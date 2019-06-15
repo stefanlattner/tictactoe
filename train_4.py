@@ -32,6 +32,9 @@ class World4(object):
         super(World4, self).__init__()
         self.size = size
         self.world = torch.FloatTensor(np.zeros((2, self.size**2)))
+        self.states = []
+        self.last_idx0 = -1
+        self.last_idx1 = -1
 
     def get_state(self, player=0):
         idx = [0, 1] if player == 0 else [1, 0]
@@ -39,13 +42,30 @@ class World4(object):
 
     def add_to_state(self, choice, player=0):
         self.world[player] = self.world[player] + choice
+        if player == 0:
+            self.last_idx0 = torch.argmax(choice)
+        if player == 1:
+            self.last_idx1 = torch.argmax(choice)
+
         assert not np.any(self.world > 1)
+
+    def save_state(self, pred):
+        # pred = prediction which lead to this state
+        self.states.append({"pred": pred.detach(),
+                            "world": self.world.clone().detach(),
+                            "mask": self.mask(),
+                            "state_pl0": self.get_state(0),
+                            "state_pl1": self.get_state(1)
+                            })
 
     def mask(self):
         return 1 - self.world.sum(0)
 
     def print(self):
-        world_tmp = self.world.clone()
+        self.print_state(self.world)
+
+    def print_state(self, world_):
+        world_tmp = world_.clone()
         world_tmp[0] *= 1
         world_tmp[1] *= 2
         print(world_tmp.sum(0).view((self.size, self.size)))
@@ -54,6 +74,8 @@ class World4(object):
         return self.size**2 == self.world.sum()
 
     def game_over(self):
+        if False: #len(self.states) > 1:
+            return (False, True)
         world = self.world.clone().detach()
         horizx = np.any(
             world[0].view([self.size]*2).sum(0).data == self.size)
@@ -78,36 +100,66 @@ class World4(object):
     def reset(self):
         self.world = self.world.clone().detach()
         self.world *= 0
+        self.states = []
+        self.last_idx0 = -1
+        self.last_idx1 = -1
+
+    def plot_grads(self):
+        print(self.world.grad)
+
+
+
+def compare_states(player_init=0):
+    print("Simulate game..")
+    player = player_init
+    for i in range(len(world.states)):
+        curr_state = world.states[i]
+        if player == 1:
+            curr_input = curr_state["state_pl0"]
+        else:
+            curr_input = curr_state["state_pl1"]
+
+        curr_pred = model(curr_input, curr_state["mask"])
+        last_pred = curr_state["pred"]
+        world.print_state(curr_state["world"])
+        print((curr_pred - last_pred).view((4,4)))
+        #print(curr_state)
+        player = (player + 1) % 2
 
 
 def run(world, model, optimizer, batch_size=100):
     world.reset()
     i = 0
-    to_2 = 0
     while i < 100000:
         if i % batch_size == 0:
             optimizer.zero_grad()
 
-        if to_2 == 0:
-            player_init = np.random.randint(2)
-            world_init = np.random.randint(0, world.size ** 2)
-            to_2 = 1
-        else:
-            to_2 = 0
+        player_init = 0 #np.random.randint(2)
+        world_init = np.random.randint(0, world.size ** 2)
 
-        result = play_game(model, optimizer, world, player_init, world_init,
+        result = play_game(model, world, player_init, world_init,
                            verbose=False)
 
         if np.any(result):
-            loss0 = world.world[0].mean() * ((2 * (result[0])) - 1)
-            loss1 = world.world[0].mean() * ((2 * (result[1])) - 1)
+            #idx0 = world.world[0] > 0
+            #idx1 = world.world[1] > 0
+            loss0 = world.world[0][world.last_idx0] * ((2 * (result[1])) - 1)
+            loss1 = world.world[1][world.last_idx1] * ((2 * (result[0])) - 1)
             loss = loss0 + loss1
             loss.backward()
+            #world.plot_grads()
+            optimizer.step()
+
             if i % batch_size == 0:
-                optimizer.step()
                 print(f"\n--------------{i}--------------")
+                world.print()
                 print(result)
+                compare_states()
+
+
             i = i + 1
+
+        #print(model.layers[0].weight)
 
         world.reset()
 
@@ -120,7 +172,7 @@ def run(world, model, optimizer, batch_size=100):
                 world.reset()
                 player_init = np.random.randint(2)
                 world_init = np.random.randint(0, world.size ** 2)
-                result = play_game(model, optimizer, world, player_init, world_init,
+                result = play_game(model, world, player_init, world_init,
                                    verbose=False, random_guess=True)
                 results.append(result)
                 world.reset()
@@ -129,9 +181,7 @@ def run(world, model, optimizer, batch_size=100):
             print(f"Evaluation = {ratio}")
 
 
-
-
-def play_game(model, optimizer, world, player_init, world_init, verbose=False,
+def play_game(model, world, player_init, world_init, verbose=False,
               random_guess=False):
 
     player = player_init
@@ -143,6 +193,7 @@ def play_game(model, optimizer, world, player_init, world_init, verbose=False,
     while not world.game_full():
         player = (player + 1) % 2
         pred = model(world.get_state(player), world.mask())
+        world.save_state(pred)
 
         if random_guess and player == 2:
             pred = pred * 0 + world.mask() // np.sum(world.mask())
@@ -172,5 +223,5 @@ if __name__ == '__main__':
     world = World4(4)
     n_out = world.size**2
     model = FFNN(n_out * 2, n_out, n_mid=128)
-    optimizer = Adam(model.parameters(), lr=0.01)
+    optimizer = Adam(model.parameters(), lr=0.001)
     run(world, model, optimizer)
