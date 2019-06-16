@@ -133,6 +133,7 @@ def compare_states(player_init=0):
 def run(world, model, optimizer, batch_size=100):
     world.reset()
     i = 0
+    temp = 2.5
     while i < 1e6:
         if i % batch_size == 0:
             optimizer.zero_grad()
@@ -141,7 +142,8 @@ def run(world, model, optimizer, batch_size=100):
         world_init = np.random.randint(0, world.size ** 2)
 
         result = play_game(model, world, player_init, world_init,
-                           verbose=i % 500 == 0)
+                           verbose=i % 500 == 0,
+                           temperature=temp)
 
         if np.any(result):
             idx0 = world.world[0] > 0
@@ -167,6 +169,7 @@ def run(world, model, optimizer, batch_size=100):
         #print(model.layers[0].weight)
 
         world.reset()
+        temp = np.maximum(1, temp * (1 - 1e-5))
 
         if i % 5000 == 1:
             evaluate()
@@ -175,8 +178,9 @@ def run(world, model, optimizer, batch_size=100):
 def evaluate():
     print("Evaluate..")
     results = []
-    for j in range(1000):
-        if j % 100 == 0:
+    nr_games = 10000
+    for j in range(nr_games):
+        if j % 1000 == 0:
             print(j)
         world.reset()
         player_init = np.random.randint(2)
@@ -187,12 +191,17 @@ def evaluate():
         world.reset()
     sums = np.sum(results, axis=0)
     ratio = sums / np.sum(sums)
-    print(f"Evaluation = {ratio}")
+    print(f"Won/Lost against random guessing in {nr_games} games = {ratio}")
+
+
+def heat(dist, t):
+    return dist ** (1 / t) / (dist ** (1 / t)).sum()
 
 
 def play_game(model, world, player_init, world_init, verbose=True,
-              random_guess=False):
+              random_guess=False, temperature=1.):
 
+    t = temperature
     player = player_init
     world.world[player, world_init] = 1
 
@@ -202,17 +211,18 @@ def play_game(model, world, player_init, world_init, verbose=True,
     while not world.game_full():
         player = (player + 1) % 2
         pred = model(world.get_state(player), world.mask())
-        world.save_state(pred)
 
         if random_guess and player == 1:
             pred = (pred * 0 + world.mask().float()) / torch.sum(world.mask())
 
         if verbose:
-            print(np.var(model.layers[0].weight.cpu().data.numpy()))
-            print(pred.view((world.size, world.size)))
+            print(f"Prediction of player {player} (t={t}):")
+            print(heat(pred, t).view((world.size, world.size)))
 
-        s = Categorical(pred)
+        world.save_state(pred)
+        s = Categorical(heat(pred, t))
         vals = s.sample()
+        assert True != 0, "ups"
         choice = world.world[0].detach().clone() * 0
         #print(vals)
         choice[vals] = 1
@@ -220,6 +230,7 @@ def play_game(model, world, player_init, world_init, verbose=True,
         world.add_to_state(add_choice, player)
 
         if verbose:
+            print(f"New State (chosen: {vals}) =")
             world.print()
 
         result = world.game_over()
