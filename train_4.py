@@ -101,7 +101,7 @@ class World4(object):
                (horizy or verty or diagdowny or diagupy)
 
     def reset(self):
-        self.world = self.world.clone().detach()
+        self.world = self.world.detach().clone()
         self.world *= 0
         self.states = []
         self.last_idx0 = -1
@@ -141,7 +141,7 @@ def run(world, model, optimizer, batch_size=100):
         world_init = np.random.randint(0, world.size ** 2)
 
         result = play_game(model, world, player_init, world_init,
-                           verbose=False)
+                           verbose=i % 500 == 0)
 
         if np.any(result):
             idx0 = world.world[0] > 0
