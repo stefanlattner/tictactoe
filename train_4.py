@@ -10,19 +10,22 @@ class FFNN(nn.Module):
     def __init__(self, n_in, n_out, n_mid):
         super(FFNN, self).__init__()
         self.layers = nn.ModuleList([nn.Linear(n_in, n_mid),
-                                nn.Linear(n_mid, n_mid),
-                                nn.Linear(n_mid, n_out)])
+                                     nn.Linear(n_mid, n_mid),
+                                     nn.Linear(n_mid, n_out)])
+
+        self.softmax = nn.Softmax()
 
     def forward(self, x, mask):
         for l in self.layers[:-1]:
             x = nn.SELU()(l(x))
 
-        x = self.layers[-1](x)
+        x = self.layers[-1](x) * mask.float()
 
-        x = x * mask
-        x = x - x.min()
-        x = ((x + 1e-8) * mask)
-        x = x / x.sum()
+        #x[x < 0] = 0
+        x[mask] = self.softmax(x[mask])
+        # x = x - x.min()
+        # x = ((x + 1e-8) * mask)
+        #x = x / (x.sum() + 1e-6)
         return x
 
 
@@ -59,7 +62,7 @@ class World4(object):
                             })
 
     def mask(self):
-        return 1 - self.world.sum(0)
+        return (1 - self.world.sum(0)).byte()
 
     def print(self):
         self.print_state(self.world)
@@ -130,7 +133,7 @@ def compare_states(player_init=0):
 def run(world, model, optimizer, batch_size=100):
     world.reset()
     i = 0
-    while i < 100000:
+    while i < 1e6:
         if i % batch_size == 0:
             optimizer.zero_grad()
 
@@ -144,8 +147,9 @@ def run(world, model, optimizer, batch_size=100):
             idx0 = world.world[0] > 0
             idx1 = world.world[1] > 0
             #world.last_idx0
-            loss0 = world.world[0][idx0].mean() * ((2 * (result[1])) - 1)
-            loss1 = world.world[1][idx1].mean() * ((2 * (result[0])) - 1)
+            loss0 = world.world[0][world.last_idx0].sum() * ((2 * (result[1])) - 1)
+            loss1 = world.world[1][world.last_idx1].sum() * ((2 * (result[
+                0])) - 1)
             loss = loss0 + loss1
             loss.backward()
             #world.plot_grads()
@@ -164,7 +168,7 @@ def run(world, model, optimizer, batch_size=100):
 
         world.reset()
 
-        if i % 1000 == 0 and np.any(result):
+        if i % 5000 == 0 and np.any(result):
             print("Evaluate..")
             results = []
             for j in range(1000):
@@ -182,14 +186,14 @@ def run(world, model, optimizer, batch_size=100):
             print(f"Evaluation = {ratio}")
 
 
-def play_game(model, world, player_init, world_init, verbose=False,
+def play_game(model, world, player_init, world_init, verbose=True,
               random_guess=False):
 
     player = player_init
     world.world[player, world_init] = 1
 
-    if verbose:
-        print(f"initial: player {player}, world {world_rand}")
+    #if verbose:
+        #print(f"initial: player {player}, world {world_rand}")
 
     while not world.game_full():
         player = (player + 1) % 2
@@ -200,12 +204,13 @@ def play_game(model, world, player_init, world_init, verbose=False,
             pred = pred * 0 + world.mask() // np.sum(world.mask())
 
         if verbose:
-            print(np.var(model.layers[0].weight.data.numpy()))
+            print(np.var(model.layers[0].weight.cpu().data.numpy()))
             print(pred.view((world.size, world.size)))
 
         s = Categorical(pred)
         vals = s.sample()
         choice = world.world[0].clone() * 0
+        #print(vals)
         choice[vals] = 1
         add_choice = pred + (choice - pred).detach()
         world.add_to_state(add_choice, player)
@@ -225,5 +230,5 @@ if __name__ == '__main__':
     n_out = world.size**2
     model = FFNN(n_out * 2, n_out, n_mid=128)
     model.cuda()
-    optimizer = Adam(model.parameters(), lr=0.001)
+    optimizer = Adam(model.parameters(), lr=1e-4)
     run(world, model, optimizer)
