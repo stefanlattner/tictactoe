@@ -168,7 +168,7 @@ def run(world, model, optimizer, batch_size=100):
 
         world.reset()
 
-        if i % 500 == 0:
+        if i % 5000 == 1:
             evaluate()
 
 
