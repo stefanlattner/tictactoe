@@ -111,7 +111,6 @@ class World4(object):
         print(self.world.grad)
 
 
-
 def compare_states(player_init=0):
     print("Simulate game..")
     player = player_init
@@ -133,10 +132,10 @@ def compare_states(player_init=0):
 def run(world, model, optimizer, batch_size=100):
     world.reset()
     i = 0
-    temp = 2.5
+    temp = 1
     while i < 1e6:
-        if i % batch_size == 0:
-            optimizer.zero_grad()
+        #if i % batch_size == 0:
+        optimizer.zero_grad()
 
         player_init = 0 #np.random.randint(2)
         world_init = np.random.randint(0, world.size ** 2)
@@ -158,6 +157,7 @@ def run(world, model, optimizer, batch_size=100):
             optimizer.step()
 
             if i % batch_size == 0:
+
                 print(f"\n--------------{i}--------------")
                 #world.print()
                 print(result)
@@ -171,27 +171,28 @@ def run(world, model, optimizer, batch_size=100):
         world.reset()
         temp = np.maximum(1, temp * (1 - 1e-5))
 
-        if i % 5000 == 1:
+        if i % 5000 == 1 and np.any(result):
             evaluate()
 
 
 def evaluate():
-    print("Evaluate..")
-    results = []
-    nr_games = 10000
-    for j in range(nr_games):
-        if j % 1000 == 0:
-            print(j)
-        world.reset()
-        player_init = np.random.randint(2)
-        world_init = np.random.randint(0, world.size ** 2)
-        result = play_game(model, world, player_init, world_init,
-                           verbose=False, random_guess=True)
-        results.append(result)
-        world.reset()
-    sums = np.sum(results, axis=0)
-    ratio = sums / np.sum(sums)
-    print(f"Won/Lost against random guessing in {nr_games} games = {ratio}")
+    with torch.no_grad():
+        print("Evaluate..")
+        results = []
+        nr_games = 2000
+        for j in range(nr_games):
+            if j % 500 == 0:
+                print(j)
+            world.reset()
+            player_init = np.random.randint(2)
+            world_init = np.random.randint(0, world.size ** 2)
+            result = play_game(model, world, player_init, world_init,
+                               verbose=False, random_guess=True)
+            results.append(result)
+            world.reset()
+        sums = np.sum(results, axis=0)
+        ratio = sums / np.sum(sums)
+        print(f"Won/Lost against random guessing in {nr_games} games = {ratio}")
 
 
 def heat(dist, t):
@@ -216,17 +217,19 @@ def play_game(model, world, player_init, world_init, verbose=True,
             pred = (pred * 0 + world.mask().float()) / torch.sum(world.mask())
 
         if verbose:
-            print(f"Prediction of player {player} (t={t}):")
+            print(f"Prediction of player {player+1} (t={t}):")
             print(heat(pred, t).view((world.size, world.size)))
 
         world.save_state(pred)
         s = Categorical(heat(pred, t))
         vals = s.sample()
-        assert True != 0, "ups"
         choice = world.world[0].detach().clone() * 0
         #print(vals)
         choice[vals] = 1
-        add_choice = pred + (choice - pred).detach()
+        #distance = (choice - pred).detach().abs()
+        #add_choice = pred * distance + (choice - pred * distance).detach()
+        distance = (choice - pred).detach()
+        add_choice = pred + distance
         world.add_to_state(add_choice, player)
 
         if verbose:
@@ -240,7 +243,15 @@ def play_game(model, world, player_init, world_init, verbose=True,
     return result
 
 
+def save_model(save_key=""):
+    torch.save(f"{cache_fn}{save_key}.save", model.get_state_dict())
+
+def load_model(save_key=""):
+    return model.load_state_dict(f"{cache_fn}{save_key}.save")
+
+
 if __name__ == '__main__':
+    cache_fn = "model_"
     world = World4(4)
     n_out = world.size**2
     model = FFNN(n_out * 2, n_out, n_mid=128)
