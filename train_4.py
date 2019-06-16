@@ -55,7 +55,7 @@ class World4(object):
     def save_state(self, pred):
         # pred = prediction which lead to this state
         self.states.append({"pred": pred.detach(),
-                            "world": self.world.clone().detach(),
+                            "world": self.world.detach().clone(),
                             "mask": self.mask(),
                             "state_pl0": self.get_state(0),
                             "state_pl1": self.get_state(1)
@@ -168,22 +168,26 @@ def run(world, model, optimizer, batch_size=100):
 
         world.reset()
 
-        if i % 5000 == 0 and np.any(result):
-            print("Evaluate..")
-            results = []
-            for j in range(1000):
-                if j % 100 == 0:
-                    print(j)
-                world.reset()
-                player_init = np.random.randint(2)
-                world_init = np.random.randint(0, world.size ** 2)
-                result = play_game(model, world, player_init, world_init,
-                                   verbose=False, random_guess=True)
-                results.append(result)
-                world.reset()
-            sums = np.sum(results, axis=0)
-            ratio = sums / np.sum(sums)
-            print(f"Evaluation = {ratio}")
+        if i % 500 == 0:
+            evaluate()
+
+
+def evaluate():
+    print("Evaluate..")
+    results = []
+    for j in range(1000):
+        if j % 100 == 0:
+            print(j)
+        world.reset()
+        player_init = np.random.randint(2)
+        world_init = np.random.randint(0, world.size ** 2)
+        result = play_game(model, world, player_init, world_init,
+                           verbose=False, random_guess=True)
+        results.append(result)
+        world.reset()
+    sums = np.sum(results, axis=0)
+    ratio = sums / np.sum(sums)
+    print(f"Evaluation = {ratio}")
 
 
 def play_game(model, world, player_init, world_init, verbose=True,
@@ -200,8 +204,8 @@ def play_game(model, world, player_init, world_init, verbose=True,
         pred = model(world.get_state(player), world.mask())
         world.save_state(pred)
 
-        if random_guess and player == 2:
-            pred = pred * 0 + world.mask() // np.sum(world.mask())
+        if random_guess and player == 1:
+            pred = (pred * 0 + world.mask().float()) / torch.sum(world.mask())
 
         if verbose:
             print(np.var(model.layers[0].weight.cpu().data.numpy()))
@@ -209,7 +213,7 @@ def play_game(model, world, player_init, world_init, verbose=True,
 
         s = Categorical(pred)
         vals = s.sample()
-        choice = world.world[0].clone() * 0
+        choice = world.world[0].detach().clone() * 0
         #print(vals)
         choice[vals] = 1
         add_choice = pred + (choice - pred).detach()
