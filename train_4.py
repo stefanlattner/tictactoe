@@ -11,6 +11,8 @@ class FFNN(nn.Module):
         super(FFNN, self).__init__()
         self.layers = nn.ModuleList([nn.Linear(n_in, n_mid),
                                      nn.Linear(n_mid, n_mid),
+                                     nn.Linear(n_mid, n_mid),
+                                     nn.Linear(n_mid, n_mid),
                                      nn.Linear(n_mid, n_out)])
 
         self.softmax = nn.Softmax()
@@ -129,52 +131,6 @@ def compare_states(player_init=0):
         player = (player + 1) % 2
 
 
-def run(world, model, optimizer, batch_size=100):
-    world.reset()
-    i = 0
-    temp = 1
-    while i < 1e6:
-        #if i % batch_size == 0:
-        optimizer.zero_grad()
-
-        player_init = 0 #np.random.randint(2)
-        world_init = np.random.randint(0, world.size ** 2)
-
-        result = play_game(model, world, player_init, world_init,
-                           verbose=i % 500 == 0,
-                           temperature=temp)
-
-        if np.any(result):
-            idx0 = world.world[0] > 0
-            idx1 = world.world[1] > 0
-            #world.last_idx0
-            loss0 = world.world[0][world.last_idx0].sum() * ((2 * (result[1])) - 1)
-            loss1 = world.world[1][world.last_idx1].sum() * ((2 * (result[
-                0])) - 1)
-            loss = loss0 + loss1
-            loss.backward()
-            #world.plot_grads()
-            optimizer.step()
-
-            if i % batch_size == 0:
-
-                print(f"\n--------------{i}--------------")
-                #world.print()
-                print(result)
-                #compare_states()
-
-
-            i = i + 1
-
-        #print(model.layers[0].weight)
-
-        world.reset()
-        temp = np.maximum(1, temp * (1 - 1e-5))
-
-        if i % 5000 == 1 and np.any(result):
-            evaluate()
-
-
 def evaluate():
     with torch.no_grad():
         print("Evaluate..")
@@ -197,6 +153,59 @@ def evaluate():
 
 def heat(dist, t):
     return dist ** (1 / t) / (dist ** (1 / t)).sum()
+
+
+def run(world, model, optimizer, batch_size=100):
+    world.reset()
+    i = 0
+    temp = 1
+    while i < 1e6:
+        #if i % batch_size == 0:
+        optimizer.zero_grad()
+
+        player_init = np.random.randint(2)
+        world_init = np.random.randint(0, world.size ** 2)
+
+        result = play_game(model, world, player_init, world_init,
+                           verbose=i % 1000 == 0,
+                           temperature=temp,
+                           random_guess=i % 5 == 1)
+
+        if np.any(result):
+            idx0 = world.world[0] > 0
+            idx1 = world.world[1] > 0
+            #world.last_idx0
+            if result[0]:
+                loss0 = world.world[0][world.last_idx0].sum() * -1
+            else:
+                loss0 = world.world[0][world.last_idx0].sum() * 2
+
+            if result[1]:
+                loss1 = world.world[1][world.last_idx1].sum() * -1
+            else:
+                loss1 = world.world[1][world.last_idx1].sum() * 2
+
+            loss = loss0 + loss1
+            loss.backward()
+            #world.plot_grads()
+            optimizer.step()
+
+            if i % (batch_size * 50) == 0:
+                print(f"\n--------------{i}--------------")
+                #world.print()
+                print(result)
+                #compare_states()
+
+
+            i = i + 1
+
+        #print(model.layers[0].weight)
+
+        world.reset()
+        temp = np.maximum(1, temp * (1 - 1e-5))
+
+        if i % 5000 == 1 and np.any(result):
+            evaluate()
 
 
 def play_game(model, world, player_init, world_init, verbose=True,
@@ -254,7 +263,7 @@ if __name__ == '__main__':
     cache_fn = "model_"
     world = World4(4)
     n_out = world.size**2
-    model = FFNN(n_out * 2, n_out, n_mid=128)
+    model = FFNN(n_out * 2, n_out, n_mid=256)
     model.cuda()
     optimizer = Adam(model.parameters(), lr=1e-4)
-    run(world, model, optimizer)
+    run(world, model, optimizer, batch_size=10)
