@@ -160,7 +160,7 @@ def run(world, model, optimizer, batch_size=100):
     i = 0
     temp = 1
     while i < 1e6:
-        if i % batch_size == 1:
+        if i % batch_size == 0:
             optimizer.zero_grad()
 
         player_init = np.random.randint(2)
@@ -172,8 +172,8 @@ def run(world, model, optimizer, batch_size=100):
                            random_guess=i % 5 == 1)
 
         if np.any(result):
-            idx0 = world.world[0] > 0
-            idx1 = world.world[1] > 0
+            # idx0 = world.world[0] > 0
+            # idx1 = world.world[1] > 0
             #world.last_idx0
             if result[0]:
                 loss0 = world.world[0][world.last_idx0].sum() * -1
@@ -198,7 +198,7 @@ def run(world, model, optimizer, batch_size=100):
 
             i = i + 1
 
-        if i % batch_size == 0:
+        if (i+1) % batch_size == 0:
             optimizer.step()
 
         #print(model.layers[0].weight)
@@ -249,6 +249,8 @@ def play_game(model, world, player_init, world_init, verbose=True,
 
         result = world.game_over()
         if np.any(result):
+            if verbose:
+                print(f"Finished: {result}")
             break
 
     return result
@@ -257,12 +259,13 @@ def play_game(model, world, player_init, world_init, verbose=True,
 def save_model(save_key=""):
     torch.save(f"{cache_fn}{save_key}.save", model.get_state_dict())
 
+
 def load_model(save_key=""):
     return model.load_state_dict(f"{cache_fn}{save_key}.save")
 
 
 if __name__ == '__main__':
-    batch_size = 100
+    batch_size = 1
     cache_fn = "model_"
     world = World4(4)
     n_out = world.size**2
