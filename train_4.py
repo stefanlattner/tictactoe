@@ -171,19 +171,24 @@ def run(world, model, optimizer, batch_size=100):
                            temperature=temp,
                            random_guess=i % 5 == 1)
 
-        if np.any(result):
+        if True: #np.any(result):
             idx0 = world.world[0] > 0
             idx1 = world.world[1] > 0
             #world.last_idx0
-            if result[0]:
-                loss0 = world.world[0][world.last_idx0].sum() * -1
-            else:
-                loss0 = world.world[0][world.last_idx0].sum() * 2
 
-            if result[1]:
-                loss1 = world.world[1][world.last_idx1].sum() * -1
+            if result[0] and result[1]:
+                loss0 = world.world[0][world.last_idx0].sum() * -.5
+                loss1 = world.world[1][world.last_idx1].sum() * -.5
             else:
-                loss1 = world.world[1][world.last_idx1].sum() * 2
+                if result[0]:
+                    loss0 = world.world[0][world.last_idx0].sum() * -1
+                else:
+                    loss0 = world.world[0][world.last_idx0].sum() * 1
+
+                if result[1]:
+                    loss1 = world.world[1][world.last_idx1].sum() * -1
+                else:
+                    loss1 = world.world[1][world.last_idx1].sum() * 1
 
             loss = loss0 + loss1
             loss.backward()
@@ -206,7 +211,7 @@ def run(world, model, optimizer, batch_size=100):
         world.reset()
         temp = np.maximum(1, temp * (1 - 1e-5))
 
-        if i % 5000 == 1 and np.any(result):
+        if i % 5000 == 1: #and np.any(result):
             evaluate()
 
 
@@ -249,7 +254,14 @@ def play_game(model, world, player_init, world_init, verbose=True,
 
         result = world.game_over()
         if np.any(result):
+            if verbose:
+                print(f"Finished: {result}")
             break
+
+    if world.game_full() and not np.any(result):
+        if verbose:
+            print(f"Draw!")
+        return [True, True]
 
     return result
 
@@ -262,7 +274,7 @@ def load_model(save_key=""):
 
 
 if __name__ == '__main__':
-    batch_size = 100
+    batch_size = 10
     cache_fn = "model_"
     world = World4(4)
     n_out = world.size**2
