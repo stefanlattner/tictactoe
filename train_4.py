@@ -160,8 +160,8 @@ def run(world, model, optimizer, batch_size=100):
     i = 0
     temp = 1
     while i < 1e6:
-        #if i % batch_size == 0:
-        optimizer.zero_grad()
+        if i % batch_size == 1:
+            optimizer.zero_grad()
 
         player_init = np.random.randint(2)
         world_init = np.random.randint(0, world.size ** 2)
@@ -188,9 +188,8 @@ def run(world, model, optimizer, batch_size=100):
             loss = loss0 + loss1
             loss.backward()
             #world.plot_grads()
-            optimizer.step()
 
-            if i % (batch_size * 50) == 0:
+            if i % 500 == 0:
                 print(f"\n--------------{i}--------------")
                 #world.print()
                 print(result)
@@ -198,6 +197,9 @@ def run(world, model, optimizer, batch_size=100):
 
 
             i = i + 1
+
+        if i % batch_size == 0:
+            optimizer.step()
 
         #print(model.layers[0].weight)
 
@@ -260,10 +262,11 @@ def load_model(save_key=""):
 
 
 if __name__ == '__main__':
+    batch_size = 100
     cache_fn = "model_"
     world = World4(4)
     n_out = world.size**2
     model = FFNN(n_out * 2, n_out, n_mid=256)
     model.cuda()
     optimizer = Adam(model.parameters(), lr=1e-4)
-    run(world, model, optimizer, batch_size=10)
+    run(world, model, optimizer, batch_size=batch_size)
