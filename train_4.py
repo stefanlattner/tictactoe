@@ -169,32 +169,21 @@ def train(world, model, optimizer, batch_size=100):
         result = play_game(model, world, player_init, world_init,
                            verbose=i % 1000 == 0,
                            temperature=temp,
-                           random_guess=i % 5 == 1)
+                           random_guess=False)
 
-        if np.any(result):
-            # idx0 = world.world[0] > 0
-            # idx1 = world.world[1] > 0
-            #world.last_idx0
-            if result[0]:
-                loss0 = world.world[0][world.last_idx0].sum() * -1
-            else:
-                loss0 = world.world[0][world.last_idx0].sum() * 1
+        if result[0]:
+            loss0 = world.world[0][world.last_idx0].sum() * -1
+        elif result[1]:
+            loss0 = world.world[0][world.last_idx0].sum() * 1
+        else: #Draw
+            loss0 = world.world[0][world.last_idx0].sum() * .5
 
-            # if result[1]:
-            #     loss1 = world.world[1][world.last_idx1].sum() * -1
-            # else:
-            #     loss1 = world.world[1][world.last_idx1].sum() * 1
+        loss = loss0
+        loss.backward()
 
-            loss = loss0
-            loss.backward()
-            #world.plot_grads()
-
-            if i % 500 == 0:
-                print(f"\n--------------{i}--------------")
-                #world.print()
-                print(result)
-                #compare_states()
-
+        if i % 500 == 0:
+            print(f"\n--------------{i}--------------")
+            print(result)
 
         i = i + 1
 
@@ -240,10 +229,10 @@ def play_game(model, world, player_init, world_init, verbose=True,
         choice = world.world[0].detach().clone() * 0
         #print(vals)
         choice[vals] = 1
-        distance = (choice - pred).detach().abs()
-        add_choice = pred * distance + (choice - pred * distance).detach()
-        #distance = (choice - pred).detach()
-        #add_choice = pred + distance
+        #distance = (choice - pred).detach().abs()
+        #add_choice = pred * distance + (choice - pred * distance).detach()
+        distance = (choice - pred).detach()
+        add_choice = pred + distance
         world.add_to_state(add_choice, player)
 
         if verbose:
