@@ -64,7 +64,7 @@ class World4(object):
                             })
 
     def mask(self):
-        return (1 - self.world.sum(0)).byte()
+        return (1 - self.world.detach().sum(0)).byte()
 
     def print(self):
         self.print_state(self.world)
@@ -155,7 +155,7 @@ def heat(dist, t):
     return dist ** (1 / t) / (dist ** (1 / t)).sum()
 
 
-def run(world, model, optimizer, batch_size=100):
+def train(world, model, optimizer, batch_size=100):
     world.reset()
     i = 0
     temp = 1
@@ -169,7 +169,7 @@ def run(world, model, optimizer, batch_size=100):
         result = play_game(model, world, player_init, world_init,
                            verbose=i % 1000 == 0,
                            temperature=temp,
-                           random_guess=i % 5 == 1)
+                           random_guess=False)
 
         if np.any(result):
             # idx0 = world.world[0] > 0
@@ -178,14 +178,14 @@ def run(world, model, optimizer, batch_size=100):
             if result[0]:
                 loss0 = world.world[0][world.last_idx0].sum() * -1
             else:
-                loss0 = world.world[0][world.last_idx0].sum() * 2
+                loss0 = world.world[0][world.last_idx0].sum() * 1
 
-            if result[1]:
-                loss1 = world.world[1][world.last_idx1].sum() * -1
-            else:
-                loss1 = world.world[1][world.last_idx1].sum() * 2
+            # if result[1]:
+            #     loss1 = world.world[1][world.last_idx1].sum() * -1
+            # else:
+            #     loss1 = world.world[1][world.last_idx1].sum() * 1
 
-            loss = loss0 + loss1
+            loss = loss0
             loss.backward()
             #world.plot_grads()
 
@@ -224,8 +224,10 @@ def play_game(model, world, player_init, world_init, verbose=True,
         player = (player + 1) % 2
         pred = model(world.get_state(player), world.mask())
 
-        if random_guess and player == 1:
-            pred = (pred * 0 + world.mask().float()) / torch.sum(world.mask())
+        if player == 1:
+            pred = pred.detach()
+            if random_guess:
+                pred = (pred * 0 + world.mask().float()) / torch.sum(world.mask())
 
         if verbose:
             print(f"Prediction of player {player+1} (t={t}):")
@@ -272,4 +274,4 @@ if __name__ == '__main__':
     model = FFNN(n_out * 2, n_out, n_mid=256)
     model.cuda()
     optimizer = Adam(model.parameters(), lr=1e-4)
-    run(world, model, optimizer, batch_size=batch_size)
+    train(world, model, optimizer, batch_size=batch_size)
