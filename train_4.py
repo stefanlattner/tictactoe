@@ -169,7 +169,7 @@ def train(world, model, optimizer, batch_size=100):
         result = play_game(model, world, player_init, world_init,
                            verbose=i % 1000 == 0,
                            temperature=temp,
-                           random_guess=False)
+                           random_guess=i % 5 == 1)
 
         if np.any(result):
             # idx0 = world.world[0] > 0
@@ -196,7 +196,7 @@ def train(world, model, optimizer, batch_size=100):
                 #compare_states()
 
 
-            i = i + 1
+        i = i + 1
 
         if (i+1) % batch_size == 0:
             optimizer.step()
@@ -236,13 +236,14 @@ def play_game(model, world, player_init, world_init, verbose=True,
         world.save_state(pred)
         s = Categorical(heat(pred, t))
         vals = s.sample()
+        #vals = torch.argmax(pred)
         choice = world.world[0].detach().clone() * 0
         #print(vals)
         choice[vals] = 1
-        #distance = (choice - pred).detach().abs()
-        #add_choice = pred * distance + (choice - pred * distance).detach()
-        distance = (choice - pred).detach()
-        add_choice = pred + distance
+        distance = (choice - pred).detach().abs()
+        add_choice = pred * distance + (choice - pred * distance).detach()
+        #distance = (choice - pred).detach()
+        #add_choice = pred + distance
         world.add_to_state(add_choice, player)
 
         if verbose:
