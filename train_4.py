@@ -169,7 +169,7 @@ def train(world, model, optimizer, batch_size=100):
         result = play_game(model, world, player_init, world_init,
                            verbose=i % 1000 == 0,
                            temperature=temp,
-                           random_guess=False)
+                           random_guess=i % 5 == 1)
 
         if result[0]:
             loss0 = world.world[0][world.last_idx0].sum() * -1
@@ -195,7 +195,7 @@ def train(world, model, optimizer, batch_size=100):
         world.reset()
         temp = np.maximum(1, temp * (1 - 1e-5))
 
-        if i % 5000 == 1 and np.any(result):
+        if i % 5000 == 1:
             evaluate()
 
 
@@ -240,7 +240,7 @@ def play_game(model, world, player_init, world_init, verbose=True,
             world.print()
 
         result = world.game_over()
-        if np.any(result):
+        if np.any(result) or world.game_full():
             if verbose:
                 print(f"Finished: {result}")
             break
