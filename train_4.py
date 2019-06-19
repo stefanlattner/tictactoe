@@ -159,7 +159,7 @@ def train(world, model, optimizer, batch_size=100):
     world.reset()
     i = 0
     temp = 1
-    while i < 1e6:
+    while i < 5e5:
         if i % batch_size == 0:
             optimizer.zero_grad()
 
