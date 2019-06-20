@@ -143,7 +143,8 @@ def evaluate():
             player_init = np.random.randint(2)
             world_init = np.random.randint(0, world.size ** 2)
             result = play_game(model, world, player_init, world_init,
-                               verbose=False, random_guess=True)
+                               verbose=False, random_guess=True,
+                               take_max_prob=True)
             results.append(result)
             world.reset()
         sums = np.sum(results, axis=0)
@@ -169,16 +170,16 @@ def train(world, model, optimizer, batch_size=100):
         result = play_game(model, world, player_init, world_init,
                            verbose=i % 1000 == 0,
                            temperature=temp,
-                           random_guess=i % 5 == 1)
+                           random_guess=i % 5 == 0,
+                           prob_rand_move=0)
 
         if result[0]:
-            loss0 = world.world[0][world.last_idx0].sum() * -1
+            loss = world.world[0][world.last_idx0] * -1
         elif result[1]:
-            loss0 = world.world[0][world.last_idx0].sum() * 1
+            loss = world.world[0][world.last_idx0] * 2
         else: #Draw
-            loss0 = world.world[0][world.last_idx0].sum() * .5
+            loss = world.world[0][world.last_idx0] * .5
 
-        loss = loss0
         loss.backward()
 
         if i % 500 == 0:
@@ -198,9 +199,12 @@ def train(world, model, optimizer, batch_size=100):
         if i % 5000 == 1:
             evaluate()
 
+    evaluate()
+
 
 def play_game(model, world, player_init, world_init, verbose=True,
-              random_guess=False, temperature=1.):
+              random_guess=False, temperature=1., prob_rand_move=0,
+              take_max_prob=False):
 
     t = temperature
     player = player_init
@@ -215,17 +219,22 @@ def play_game(model, world, player_init, world_init, verbose=True,
 
         if player == 1:
             pred = pred.detach()
-            if random_guess:
-                pred = (pred * 0 + world.mask().float()) / torch.sum(world.mask())
+
+        if player == 1 and (random_guess or np.random.random() < \
+                prob_rand_move):
+            pred = (pred * 0 + world.mask().float()) / torch.sum(world.mask())
 
         if verbose:
             print(f"Prediction of player {player+1} (t={t}):")
             print(heat(pred, t).view((world.size, world.size)))
 
         world.save_state(pred)
-        s = Categorical(heat(pred, t))
-        vals = s.sample()
-        #vals = torch.argmax(pred)
+        if take_max_prob:
+            vals = torch.argmax(pred)
+        else:
+            s = Categorical(heat(pred, t))
+            vals = s.sample()
+
         choice = world.world[0].detach().clone() * 0
         #print(vals)
         choice[vals] = 1
