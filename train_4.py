@@ -144,7 +144,7 @@ def evaluate():
             world_init = np.random.randint(0, world.size ** 2)
             result = play_game(model, world, player_init, world_init,
                                verbose=False, random_guess=True,
-                               take_max_prob=True)
+                               take_max_prob=False)
             results.append(result)
             world.reset()
         sums = np.sum(results, axis=0)
@@ -168,15 +168,15 @@ def train(world, model, optimizer, batch_size=100):
         world_init = np.random.randint(0, world.size ** 2)
 
         result = play_game(model, world, player_init, world_init,
-                           verbose=i % 1000 == 0,
+                           verbose=i % 2000 == 0,
                            temperature=temp,
-                           random_guess=i % 5 == 0,
+                           random_guess=i % 5 == 1,
                            prob_rand_move=0)
 
         if result[0]:
             loss = world.world[0][world.last_idx0] * -1
         elif result[1]:
-            loss = world.world[0][world.last_idx0] * 2
+            loss = world.world[0][world.last_idx0] * 1
         else: #Draw
             loss = world.world[0][world.last_idx0] * .5
 
