@@ -23,7 +23,7 @@ order to preserve a gradient when sampling, a strategy similar to the
  is possible to optimize agents taking series of discrete actions using 
  end-to-end gradient descent optimization.
  
- Stefan Lattner, 2019
+ Stefan Lattner, Sony CSL Paris, 2019
 
 ### Prerequisites ###
 
