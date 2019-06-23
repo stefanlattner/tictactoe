@@ -2,8 +2,6 @@
 
 # Fully Differentiable "Tik Tak Toe" aka "Noughts and Crosses", "Connect Four", ...
 
-<div style="text-align: right"> Stefan Lattner </div>
-
 This experiment shows that learning to play a game through self-play can be 
 achieved through end-to-end optimization without classical reinforcement 
 learning.
@@ -24,6 +22,8 @@ order to preserve a gradient when sampling, a strategy similar to the
  \>99% against a random-guessing opponent. The experiment shows that it 
  is possible to optimize agents taking series of discrete actions using 
  end-to-end gradient descent optimization.
+ 
+ Stefan Lattner, 2019
 
 ### Prerequisites ###
 
