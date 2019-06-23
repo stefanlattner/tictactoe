@@ -2,6 +2,8 @@
 
 # Fully Differentiable "Tik Tak Toe" aka "Noughts and Crosses", "Connect Four", ...
 
+<div style="text-align: right"> Stefan Lattner </div>
+
 This experiment shows that learning to play a game through self-play can be 
 achieved through end-to-end optimization without classical reinforcement 
 learning.
