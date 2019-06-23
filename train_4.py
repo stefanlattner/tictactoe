@@ -131,7 +131,7 @@ def compare_states(player_init=0):
         player = (player + 1) % 2
 
 
-def evaluate():
+def evaluate(take_max_prob=False):
     with torch.no_grad():
         print("Evaluate..")
         results = []
@@ -144,7 +144,7 @@ def evaluate():
             world_init = np.random.randint(0, world.size ** 2)
             result = play_game(model, world, player_init, world_init,
                                verbose=False, random_guess=True,
-                               take_max_prob=False)
+                               take_max_prob=take_max_prob)
             results.append(result)
             world.reset()
         sums = np.sum(results, axis=0)
