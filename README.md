@@ -1,6 +1,6 @@
 
 
-# Fully Differentiable "Tik Tak Toe" aka "Noughts and Crosses", "Connect Four", ...
+# Fully Differentiable "Tic-Tac-Toe" aka "Noughts and Crosses", "Connect Four", ...
 
 This experiment shows that learning to play a game through self-play can be 
 achieved through end-to-end optimization without classical reinforcement 
